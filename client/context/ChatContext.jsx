@@ -143,7 +143,7 @@ export const ChatProvider = ({ children }) => {
             const encryptedSessionKey = cryptoEngine.encryptSessionKey(sessionKey, selectedUser.publicKey);
             
             // 6. Encrypt Session Key with Sender's RSA Public Key (so we can read our own sent messages later)
-            const senderPublicKey = authUser.publicKey;
+            const senderPublicKey = cryptoEngine.getPublicKeyPemFromStorage();
             const senderEncryptedSessionKey = cryptoEngine.encryptSessionKey(sessionKey, senderPublicKey);
 
             const payload = {
