@@ -100,7 +100,8 @@ export const ChatProvider = ({ children }) => {
 
         } catch (error) {
             let errorMsg = "⚠️ Failed to decrypt message: Private Key mismatch";
-            if (error.message.includes("padding") || error.message.includes("data isn't an object")) {
+            // Forge throws variations of 'padding', 'data isn't an object', or 'Encrypted message is invalid' when using a new key on old data.
+            if (error.message.includes("padding") || error.message.includes("data isn't an object") || error.message.includes("invalid")) {
                 errorMsg = "⚠️ Encrypted with a previous/expired Session Key. Unreadable.";
             } else {
                 // Only log unexpected errors
