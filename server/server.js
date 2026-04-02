@@ -53,7 +53,11 @@ io.on("connection", (socket)=>{
 //middleWare setups
 app.use(express.json({limit:"50mb"}));
 app.use(express.urlencoded({limit:"50mb", extended:true}));
-app.use(cors());
+app.use(cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization", "token"]
+}));
 
 //route setup
 app.use("/api/status", (req,res)=> res.send("Server is Live..."));
