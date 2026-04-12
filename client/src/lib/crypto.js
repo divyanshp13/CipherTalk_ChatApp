@@ -17,69 +17,28 @@ export class CryptoEngine {
 
   // 1. RSA KEY PAIR GENERATION & STORAGE
   async generateKeyPair() {
-    return new Promise(async (resolve, reject) => {
+    return new Promise((resolve, reject) => {
+      console.log("CYPHER_START: Generating Key Pair using Forge (Strict Mode)...");
       try {
-        console.log("CYPHER_START: Generating Key Pair...");
-        if (!window.crypto || !window.crypto.subtle) throw new Error("WebCrypto not supported");
-        
-        console.log("CYPHER: Awaiting WebCrypto generateKey...");
-        const keyPair = await window.crypto.subtle.generateKey(
-          {
-            name: "RSA-OAEP",
-            modulusLength: this.keySize,
-            publicExponent: new Uint8Array([1, 0, 1]),
-            hash: "SHA-256"
-          },
-          true,
-          ["encrypt", "decrypt"]
-        );
-
-        console.log("CYPHER: Keys Generated natively. Exporting Private Key...");
-        const exportedPrivateKey = await window.crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
-        console.log("CYPHER: Exporting Public Key...");
-        const exportedPublicKey = await window.crypto.subtle.exportKey("spki", keyPair.publicKey);
-
-        console.log("CYPHER: Converting to string...");
-        const privBytes = new Uint8Array(exportedPrivateKey);
-        let privStr = '';
-        for (let i = 0; i < privBytes.length; i++) privStr += String.fromCharCode(privBytes[i]);
-        const privateB64 = window.btoa(privStr);
-
-        const pubBytes = new Uint8Array(exportedPublicKey);
-        let pubStr = '';
-        for (let i = 0; i < pubBytes.length; i++) pubStr += String.fromCharCode(pubBytes[i]);
-        const publicB64 = window.btoa(pubStr);
-
-        console.log("CYPHER: Formatting to PEM...");
-        const privateKeyPem = `-----BEGIN PRIVATE KEY-----\n${privateB64.match(/.{1,64}/g).join('\n')}\n-----END PRIVATE KEY-----\n`;
-        const publicKeyPem = `-----BEGIN PUBLIC KEY-----\n${publicB64.match(/.{1,64}/g).join('\n')}\n-----END PUBLIC KEY-----\n`;
-        
-        console.log("CYPHER: Storing to localStorage...");
-        localStorage.setItem(this.getStorageKey(), privateKeyPem);
-        
-        console.log("CYPHER_END: Fully Resolved via WebCrypto");
-        resolve({
-          publicKey: publicKeyPem,
-          privateKey: privateKeyPem
-        });
-      } catch (err) {
-        console.warn("CYPHER: Native WebCrypto Failed, falling back to forge. Browser may lag temporarily:", err);
-        forge.pki.rsa.generateKeyPair({ bits: this.keySize, e: 0x10001 }, (err2, keypair) => {
-           if (err2) {
-             console.error("CYPHER ERROR: Forge Failed", err2);
-             return reject(err2);
+        // Enforcing forge for 100% interoperability. WebCrypto SPKI has subtle browser mismatches with Forge OAEP.
+        forge.pki.rsa.generateKeyPair({ bits: this.keySize, e: 0x10001, workers: -1 }, (err, keypair) => {
+           if (err) {
+             console.error("CYPHER ERROR: Forge Failed", err);
+             return reject(err);
            }
            try {
              const pubPem = forge.pki.publicKeyToPem(keypair.publicKey);
              const privPem = forge.pki.privateKeyToPem(keypair.privateKey);
              localStorage.setItem(this.getStorageKey(), privPem);
-             console.log("CYPHER_END: Fully Resolved via Forge Fallback");
+             console.log("CYPHER_END: Fully Resolved via Forge");
              resolve({ publicKey: pubPem, privateKey: privPem });
            } catch(e) { 
              console.error("CYPHER ERROR: Forge Pem Failed", e);
              reject(e);
            }
         });
+      } catch (err) {
+        reject(err);
       }
     });
   }
@@ -188,6 +147,20 @@ export class CryptoEngine {
     } catch (e) {
       console.error("Signature verification failed:", e);
       return false;
+    }
+  }
+
+  // Helper to compare keys
+  checkKeyMatch(localPem, serverPem) {
+    try {
+        if (!localPem || !serverPem) return false;
+        const pk1 = forge.pki.publicKeyFromPem(localPem);
+        const pk2 = forge.pki.publicKeyFromPem(serverPem);
+        return pk1.n.toString() === pk2.n.toString() && pk1.e.toString() === pk2.e.toString();
+    } catch (e) {
+        console.warn("Key comparison error:", e);
+        // Fallback to basic string comparison if parsing fails
+        return localPem.replace(/\\s+/g, '') === serverPem.replace(/\\s+/g, '');
     }
   }
 }

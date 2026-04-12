@@ -39,12 +39,13 @@ export const AuthProvider = ({children})=>{
 
                 if (existingKey) {
                     const localDerivedPublicKey = cryptoEngine.getPublicKeyPemFromStorage();
-                    const cleanLocal = localDerivedPublicKey ? localDerivedPublicKey.replace(/\s+/g, '') : "";
-                    const cleanServer = data.user.publicKey ? data.user.publicKey.replace(/\s+/g, '') : "";
                     
-                    if (cleanServer && cleanLocal && cleanLocal !== cleanServer) {
-                        console.warn("CYPHER WARNING: Local private key does not match server public key! Regenerating to fix collision...");
-                        needsNewKeys = true;
+                    if (data.user.publicKey && localDerivedPublicKey) {
+                        const isMatch = cryptoEngine.checkKeyMatch(localDerivedPublicKey, data.user.publicKey);
+                        if (!isMatch) {
+                            console.warn("CYPHER WARNING: Local private key does not match server public key! Regenerating to fix collision...");
+                            needsNewKeys = true;
+                        }
                     }
                 }
 
@@ -84,12 +85,13 @@ export const AuthProvider = ({children})=>{
 
                 if (existingKey) {
                     const localDerivedPublicKey = cryptoEngine.getPublicKeyPemFromStorage();
-                    const cleanLocal = localDerivedPublicKey ? localDerivedPublicKey.replace(/\s+/g, '') : "";
-                    const cleanServer = data.userData.publicKey ? data.userData.publicKey.replace(/\s+/g, '') : "";
                     
-                    if (cleanServer && cleanLocal && cleanLocal !== cleanServer) {
-                        console.warn("CYPHER WARNING: Local private key does not match server public key! Regenerating to fix collision...");
-                        needsNewKeys = true;
+                    if (data.userData.publicKey && localDerivedPublicKey) {
+                        const isMatch = cryptoEngine.checkKeyMatch(localDerivedPublicKey, data.userData.publicKey);
+                        if (!isMatch) {
+                            console.warn("CYPHER WARNING: Local private key does not match server public key! Regenerating to fix collision...");
+                            needsNewKeys = true;
+                        }
                     }
                 }
 
@@ -113,6 +115,9 @@ export const AuthProvider = ({children})=>{
 
     const signUp = async (fullName, email, password, bio) => {
         try {
+            // First, absolutely clear any lingering session state before generating keys
+            cryptoEngine.setUserId(null);
+
             // Generate RSA Keys before signup. This temporary key will be stored without namespace.
             toast.loading("Generating secure keys...", {id: "signup"});
             const keys = await cryptoEngine.generateKeyPair();
@@ -150,9 +155,27 @@ export const AuthProvider = ({children})=>{
         localStorage.removeItem("token");
         setToken(null);
         setAuthUser(null);
+        cryptoEngine.setUserId(null);
         if(socket) socket.disconnect();
         // Do NOT remove private key on logout to allow reading offline messages on same device later,
         // or remove it if strictly ephemeral (but we decided offline reading requires keeping it).
+    }
+
+    const deleteAccount = async () => {
+        try {
+            const res = await axios.delete("/api/auth/delete");
+            if (res.data.success) {
+                toast.success("Account and associated messages terminated.");
+                logout();
+                return true;
+            } else {
+                toast.error(res.data.message);
+                return false;
+            }
+        } catch(error) {
+            toast.error(error.response?.data?.message || error.message);
+            return false;
+        }
     }
 
     //connect socket function to handle socket connection and online users updates
@@ -204,7 +227,8 @@ export const AuthProvider = ({children})=>{
         login,
         signUp,
         logout,
-        updateProfile
+        updateProfile,
+        deleteAccount
     }
     return (
         <AuthContext.Provider value={value}>
