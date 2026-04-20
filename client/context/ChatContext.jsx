@@ -100,7 +100,8 @@ export const ChatProvider = ({ children }) => {
 
         } catch (error) {
             let errorMsg = "⚠️ Failed to decrypt message: Private Key mismatch";
-            if (error.message.includes("padding") || error.message.includes("data isn't an object")) {
+            // Forge throws variations of 'padding', 'data isn't an object', or 'Encrypted message is invalid' when using a new key on old data.
+            if (error.message.includes("padding") || error.message.includes("data isn't an object") || error.message.includes("invalid")) {
                 errorMsg = "⚠️ Encrypted with a previous/expired Session Key. Unreadable.";
             } else {
                 // Only log unexpected errors
@@ -119,12 +120,23 @@ export const ChatProvider = ({ children }) => {
     // Send Message Pipeline
     const sendMessage = async (messageData) => {
         if (!selectedUser) return;
-        if (!selectedUser.publicKey) {
-             toast.error("User has not generated encryption keys yet. Cannot send secure message.");
-             return false;
-        }
 
         try {
+            // 0. Ensure we have the absolute latest Public Key array for the receiver to prevent encrypting for an old rotated key.
+            let activePublicKey = selectedUser.publicKey;
+            const { data: userRefresh } = await axios.get("/api/messages/users");
+            if(userRefresh && userRefresh.success) {
+                const freshUser = userRefresh.users.find(u => u._id === selectedUser._id);
+                if (freshUser && freshUser.publicKey) {
+                    activePublicKey = freshUser.publicKey;
+                }
+            }
+
+            if (!activePublicKey) {
+                 toast.error("User has not generated encryption keys yet. Cannot send secure message.");
+                 return false;
+            }
+
             // 1. Generate AES Session Key
             const sessionKey = cryptoEngine.generateSessionKey();
             
@@ -139,11 +151,11 @@ export const ChatProvider = ({ children }) => {
             // 4. Sign Hash
             const signature = cryptoEngine.signData(hash);
 
-            // 5. Encrypt Session Key with Receiver's RSA Public Key
-            const encryptedSessionKey = cryptoEngine.encryptSessionKey(sessionKey, selectedUser.publicKey);
+            // 5. Encrypt Session Key with Receiver's FRESH RSA Public Key
+            const encryptedSessionKey = cryptoEngine.encryptSessionKey(sessionKey, activePublicKey);
             
             // 6. Encrypt Session Key with Sender's RSA Public Key (so we can read our own sent messages later)
-            const senderPublicKey = authUser.publicKey;
+            const senderPublicKey = cryptoEngine.getPublicKeyPemFromStorage();
             const senderEncryptedSessionKey = cryptoEngine.encryptSessionKey(sessionKey, senderPublicKey);
 
             const payload = {

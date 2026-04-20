@@ -5,7 +5,7 @@ import assets from '../assets/assets'
 import { Shield } from 'lucide-react'
 
 const LoginPage = () => {
-    const [currState, setCurrState] = useState("Sign up")
+    const [currState, setCurrState] = useState("Login")
     const [fullName, setFullName] = useState("")
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")

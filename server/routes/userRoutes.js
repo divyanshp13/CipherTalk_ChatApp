@@ -1,5 +1,5 @@
 import express from "express"
-import { login, signUp, updateProfile, updatePublicKey } from "../controllers/userController.js";
+import { login, signUp, updateProfile, updatePublicKey, deleteAccount } from "../controllers/userController.js";
 import { checkAuth, protectRoute } from "../middleware/auth.js";
 
 const userRouter = express.Router();
@@ -10,5 +10,6 @@ userRouter.post("/login", login);
 userRouter.put("/update-profile",protectRoute, updateProfile);
 userRouter.put("/update-public-key",protectRoute, updatePublicKey);
 userRouter.get("/check",protectRoute, checkAuth);
+userRouter.delete("/delete",protectRoute, deleteAccount);
 
 export default userRouter;

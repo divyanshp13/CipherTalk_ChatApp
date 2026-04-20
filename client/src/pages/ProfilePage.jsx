@@ -6,7 +6,7 @@ import { ArrowLeft } from 'lucide-react';
 
 const ProfilePage = () => {
 
-  const { authUser, updateProfile } = useContext(AuthContext);
+  const { authUser, updateProfile, deleteAccount } = useContext(AuthContext);
   const [selectedImg, setSelectedImg] = useState(null);
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
@@ -44,6 +44,12 @@ const ProfilePage = () => {
       if(success) navigate('/');
   }
 
+  const handleDelete = async () => {
+      if(window.confirm("CRITICAL WARNING: This will permanently delete your account, identity, and all end-to-end encrypted message history across the entire network. Proceed?")) {
+          await deleteAccount();
+      }
+  }
+
   return (
     <div className='min-h-screen bg-[#050a0e] text-[#00ffcc] font-mono flex items-center justify-center p-4 selection:bg-[#00ffcc] selection:text-black'>
       <div className='w-full max-w-2xl bg-[#0a1218]/90 border border-green-500/30 flex items-center justify-between max-sm:flex-col-reverse rounded-lg shadow-[0_0_30px_rgba(0,255,204,0.1)] relative'>
@@ -77,6 +83,10 @@ const ProfilePage = () => {
 
           <button disabled={isUpdating} type="submit" className="mt-4 bg-[#00ffcc]/10 hover:bg-[#00ffcc]/20 border border-[#00ffcc]/50 text-[#00ffcc] p-3 rounded font-bold tracking-widest transition-all shadow-[0_0_15px_rgba(0,255,204,0.1)] disabled:opacity-50">
             {isUpdating ? 'SYNCING...' : 'COMMIT CHANGES'}
+          </button>
+          
+          <button type="button" onClick={handleDelete} className="mt-2 border border-red-500/50 bg-red-500/10 hover:bg-red-500/20 text-red-500 p-3 rounded font-bold tracking-widest transition-all shadow-[0_0_15px_rgba(255,0,0,0.1)]">
+              TERMINATE ACCOUNT
           </button>
         </form>
         
